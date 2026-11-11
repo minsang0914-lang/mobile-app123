@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var homeHost: String
 
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private var choosingFile = false
     private var mainFrameFailed = false
     private var pendingDownload: PendingDownload? = null
 
@@ -57,9 +58,10 @@ class MainActivity : AppCompatActivity() {
     ) { result ->
         val callback = fileCallback
         fileCallback = null
-        callback?.onReceiveValue(
-            WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
-        )
+        choosingFile = false
+        // The picker returns before onResume, so wake the WebView first.
+        if (::webView.isInitialized) webView.onResume()
+        callback?.onReceiveValue(selectedUris(result.resultCode, result.data))
     }
 
     private val storagePermission = registerForActivityResult(
@@ -123,7 +125,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        webView.onPause()
+        if (!choosingFile) webView.onPause()
         super.onPause()
     }
 
@@ -133,6 +135,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        choosingFile = false
         fileCallback?.onReceiveValue(null)
         fileCallback = null
         webView.apply {
@@ -468,16 +471,45 @@ class MainActivity : AppCompatActivity() {
             if (intent.type.isNullOrBlank()) {
                 intent.type = "video/*"
             }
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            choosingFile = true
             return try {
                 fileChooser.launch(intent)
                 true
             } catch (_: ActivityNotFoundException) {
+                choosingFile = false
                 fileCallback = null
                 filePathCallback?.onReceiveValue(null)
                 toast(R.string.file_chooser_failed)
                 false
             }
         }
+    }
+
+    private fun selectedUris(resultCode: Int, data: Intent?): Array<Uri>? {
+        if (resultCode != RESULT_OK || data == null) return null
+        val uris = linkedSetOf<Uri>()
+        data.clipData?.let { clip ->
+            for (index in 0 until clip.itemCount) {
+                clip.getItemAt(index).uri?.let { uris.add(it) }
+            }
+        }
+        data.data?.let { uris.add(it) }
+        if (uris.isEmpty()) {
+            WebChromeClient.FileChooserParams.parseResult(resultCode, data)?.forEach { uris.add(it) }
+        }
+        if (uris.isEmpty()) return null
+        uris.forEach { uri ->
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {
+                // A temporary read grant from the picker is enough for this upload.
+            }
+        }
+        return uris.toTypedArray()
     }
 
     private inner class BlobBridge {
