@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SVT</string>
+    <string name="home_url">https://minsang0914-lang.github.io/STV20220211/</string>
+    <string name="error_title">연결할 수 없습니다</string>
+    <string name="error_message">인터넷 연결을 확인한 뒤 다시 시도해 주세요.</string>
+    <string name="retry">다시 시도</string>
+    <string name="download_saved">GIF를 다운로드 폴더의 SVT에 저장했습니다.</string>
+    <string name="download_share">GIF를 저장할 앱을 선택해 주세요.</string>
+    <string name="download_failed">파일을 저장하지 못했습니다.</string>
+    <string name="file_chooser_failed">파일 선택기를 열 수 없습니다.</string>
+    <string name="link_failed">링크를 열 수 없습니다.</string>
+</resources>

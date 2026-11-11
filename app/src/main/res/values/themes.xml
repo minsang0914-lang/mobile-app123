@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SVT.Base" parent="Theme.Material3.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/site_background</item>
+        <item name="android:navigationBarColor">@color/site_background</item>
+        <item name="android:windowBackground">@color/site_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="colorPrimary">@color/brand</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+    </style>
+
+    <style name="Theme.SVT" parent="Theme.SVT.Base" />
+</resources>
