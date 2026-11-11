@@ -289,13 +289,98 @@ class MainActivity : AppCompatActivity() {
         webView.evaluateJavascript(
             """
             (function () {
-              if (!window.crypto || typeof crypto.randomUUID === "function") return;
-              crypto.randomUUID = function () {
-                return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-                  var r = Math.random() * 16 | 0;
-                  var v = c === "x" ? r : (r & 0x3 | 0x8);
-                  return v.toString(16);
+              if (!window.crypto || typeof crypto.randomUUID !== "function") {
+                if (window.crypto) {
+                  crypto.randomUUID = function () {
+                    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+                      var r = Math.random() * 16 | 0;
+                      var v = c === "x" ? r : (r & 0x3 | 0x8);
+                      return v.toString(16);
+                    });
+                  };
+                }
+              }
+              if (window.__svtDownloadInstalled) return;
+              window.__svtDownloadInstalled = true;
+
+              function sendBlob(blob, filename) {
+                return new Promise(function (resolve) {
+                  if (!blob) { resolve(); return; }
+                  var reader = new FileReader();
+                  reader.onloadend = function () {
+                    var data = String(reader.result || "");
+                    var step = 180000;
+                    $BRIDGE_NAME.start("image/gif", filename || "video.gif", location.hostname, data.length);
+                    for (var i = 0; i < data.length; i += step) {
+                      $BRIDGE_NAME.chunk(data.substring(i, Math.min(data.length, i + step)));
+                    }
+                    $BRIDGE_NAME.finish();
+                    resolve();
+                  };
+                  reader.onerror = function () {
+                    $BRIDGE_NAME.fail(location.hostname);
+                    resolve();
+                  };
+                  reader.readAsDataURL(blob);
                 });
+              }
+
+              function toBlob(data) {
+                if (!data) return null;
+                if (data instanceof Blob) return data;
+                if (data.data) return toBlob(data.data);
+                if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+                  return new Blob([data], { type: "image/gif" });
+                }
+                if (typeof data === "string") return new Blob([data], { type: "image/gif" });
+                return null;
+              }
+
+              var picker = function (options) {
+                var name = (options && options.suggestedName) || "video.gif";
+                return Promise.resolve({
+                  createWritable: function () {
+                    var parts = [];
+                    return Promise.resolve({
+                      write: function (data) {
+                        var blob = toBlob(data);
+                        if (blob) parts.push(blob);
+                        return Promise.resolve();
+                      },
+                      close: function () {
+                        if (!parts.length) return Promise.resolve();
+                        return sendBlob(new Blob(parts, { type: "image/gif" }), name);
+                      }
+                    });
+                  }
+                });
+              };
+
+              try {
+                Object.defineProperty(window, "showSaveFilePicker", {
+                  configurable: true,
+                  writable: true,
+                  value: picker
+                });
+              } catch (e) {
+                window.showSaveFilePicker = picker;
+              }
+
+              var nativeClick = HTMLAnchorElement.prototype.click;
+              HTMLAnchorElement.prototype.click = function () {
+                var href = this.href || "";
+                if (href.indexOf("blob:") === 0) {
+                  var name = this.download || "video.gif";
+                  fetch(href).then(function (response) {
+                    return response.blob();
+                  }).then(function (blob) {
+                    return sendBlob(blob, name);
+                  }).catch(function () {
+                    $BRIDGE_NAME.fail(location.hostname);
+                  });
+                  return;
+                }
+                return nativeClick.call(this);
               };
             })();
             """.trimIndent(),
